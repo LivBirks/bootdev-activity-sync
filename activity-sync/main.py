@@ -5,7 +5,6 @@ from pathlib import Path
 
 import requests
 
-START_DATE = None
 STATE_PATH = Path(__file__).parent / "synced.json"
 
 
@@ -78,6 +77,12 @@ def main():
         default="Europe/London",
         help="timezone Boot.dev groups days by (default: %(default)s)",
     )
+    parser.add_argument(
+        "-s",
+        "--start-date",
+        type=dt.date.fromisoformat,
+        help="only sync from this date, YYYY-MM-DD (default: all history)",
+    )
     args = parser.parse_args()
     # fetch
     raw_json = fetch_heatmap(args.username, args.timezone)
@@ -85,7 +90,7 @@ def main():
     heatmap = parse_heatmap(raw_json)
     # compare with what's already synced
     state = load_state(STATE_PATH)
-    result = compute_todo(heatmap, state, START_DATE)
+    result = compute_todo(heatmap, state, args.start_date)
     if not result:
         print("Nothing to sync")
         return

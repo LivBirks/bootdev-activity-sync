@@ -15,7 +15,7 @@ def load_fixture(name):
 
 
 # parse_heatmap with the sample fixture, checking the three days from Phase 0
-def test_one():
+def test_parse_heatmap_sample():
     result = parse_heatmap(load_fixture("heatmap_sample.json"))
     assert result[dt.date(2026, 8, 15)] == 24
     assert result[dt.date(2026, 8, 16)] == 82
@@ -23,25 +23,25 @@ def test_one():
 
 
 # malformed fixture raises
-def test_two():
+def test_parse_heatmap_malformed_raises():
     with pytest.raises(HeatmapError, match="invalid data"):
         parse_heatmap(load_fixture("heatmap_sample_malformed.json"))
 
 
 # empty fixture raises
-def test_three():
+def test_parse_heatmap_empty_raises():
     with pytest.raises(HeatmapError, match="No calendar data"):
         parse_heatmap(load_fixture("heatmap_sample_empty.json"))
 
 
 # a missing state file means nothing synced yet
-def test_four(tmp_path):
+def test_load_state_missing_file(tmp_path):
     result = load_state(tmp_path / "missing.json")
     assert result == {}
 
 
 # a valid state file loads with date keys
-def test_five():
+def test_load_state_sample():
     result = load_state(FIXTURES / "state_sample.json")
     assert result == {
         dt.date(2026, 8, 15): 24,
@@ -51,7 +51,7 @@ def test_five():
 
 
 # a corrupt state file raises
-def test_six():
+def test_load_state_corrupt_raises():
     with pytest.raises(json.decoder.JSONDecodeError):
         load_state(FIXTURES / "state_corrupt.json")
 
@@ -66,14 +66,14 @@ def sample_state():
 
 
 # round trip - save a dict with dt.date keys and load it back with load_state and assert its back to the same thing
-def test_seven(tmp_path, sample_state):
+def test_save_state_round_trip(tmp_path, sample_state):
     path = tmp_path / "state.json"
     save_state(sample_state, path)
     assert load_state(path) == sample_state
 
 
 # the file on disk has string keys, read with plain json.load so load_state can't hide a mistake
-def test_eight(tmp_path, sample_state):
+def test_save_state_string_keys(tmp_path, sample_state):
     path = tmp_path / "state.json"
     save_state(sample_state, path)
     with open(path) as json_data:
@@ -86,7 +86,7 @@ def test_eight(tmp_path, sample_state):
 
 
 # keys are written in date order even when the input is not
-def test_nine(tmp_path, sample_state):
+def test_save_state_sorted_keys(tmp_path, sample_state):
     path = tmp_path / "state.json"
     save_state(sample_state, path)
     with open(path) as json_data:
@@ -95,7 +95,7 @@ def test_nine(tmp_path, sample_state):
 
 
 # saving twice overwrites, it does not append
-def test_ten(tmp_path, sample_state):
+def test_save_state_overwrites(tmp_path, sample_state):
     path = tmp_path / "state.json"
     save_state(sample_state, path)
     new_state = {dt.date(2026, 11, 1): 3}
@@ -104,14 +104,14 @@ def test_ten(tmp_path, sample_state):
 
 
 # empty state round trips
-def test_eleven(tmp_path):
+def test_save_state_empty(tmp_path):
     path = tmp_path / "state.json"
     save_state({}, path)
     assert load_state(path) == {}
 
 
 # a bad key raises and leaves the existing file untouched
-def test_twelve(tmp_path, sample_state):
+def test_save_state_bad_key_keeps_file(tmp_path, sample_state):
     path = tmp_path / "state.json"
     save_state(sample_state, path)
     with pytest.raises((TypeError, AttributeError)):
@@ -120,7 +120,7 @@ def test_twelve(tmp_path, sample_state):
 
 
 # the dict passed in is not changed
-def test_thirteen(tmp_path, sample_state):
+def test_save_state_input_unchanged(tmp_path, sample_state):
     path = tmp_path / "state.json"
     before = dict(sample_state)
     save_state(sample_state, path)
@@ -128,53 +128,53 @@ def test_thirteen(tmp_path, sample_state):
 
 
 # a date not in state yet owes its full count
-def test_fourteen():
+def test_compute_todo_new_date():
     activity = {dt.date(2026, 11, 1): 5}
     assert compute_todo(activity, {}) == {dt.date(2026, 11, 1): 5}
 
 
 # a fully synced date is left out
-def test_fifteen():
+def test_compute_todo_fully_synced():
     activity = {dt.date(2026, 11, 1): 5}
     state = {dt.date(2026, 11, 1): 5}
     assert compute_todo(activity, state) == {}
 
 
 # a partly synced date owes the difference
-def test_sixteen():
+def test_compute_todo_partly_synced():
     activity = {dt.date(2026, 11, 1): 5}
     state = {dt.date(2026, 11, 1): 2}
     assert compute_todo(activity, state) == {dt.date(2026, 11, 1): 3}
 
 
 # boot.dev's count went down - never owe a negative, leave it out
-def test_seventeen():
+def test_compute_todo_count_went_down():
     activity = {dt.date(2026, 11, 1): 3}
     state = {dt.date(2026, 11, 1): 5}
     assert compute_todo(activity, state) == {}
 
 
 # a day with no activity owes nothing
-def test_eighteen():
+def test_compute_todo_zero_activity():
     activity = {dt.date(2026, 11, 1): 0}
     assert compute_todo(activity, {}) == {}
 
 
 # empty activity owes nothing
-def test_nineteen():
+def test_compute_todo_empty_activity():
     state = {dt.date(2026, 11, 1): 5}
     assert compute_todo({}, state) == {}
 
 
 # dates only in state are not in the result
-def test_twenty():
+def test_compute_todo_date_only_in_state():
     activity = {dt.date(2026, 11, 2): 1}
     state = {dt.date(2026, 11, 1): 5}
     assert compute_todo(activity, state) == {dt.date(2026, 11, 2): 1}
 
 
 # a mix of all the cases at once
-def test_twenty_one():
+def test_compute_todo_mixed():
     activity = {
         dt.date(2026, 11, 1): 5,
         dt.date(2026, 11, 2): 5,
@@ -193,7 +193,7 @@ def test_twenty_one():
 
 
 # neither input is changed
-def test_twenty_two():
+def test_compute_todo_inputs_unchanged():
     activity = {dt.date(2026, 11, 1): 5, dt.date(2026, 11, 2): 1}
     state = {dt.date(2026, 11, 1): 2}
     activity_before = dict(activity)
@@ -204,7 +204,7 @@ def test_twenty_two():
 
 
 # dates before start_date are skipped, start_date itself is included
-def test_twenty_three():
+def test_compute_todo_start_date():
     activity = {
         dt.date(2026, 10, 31): 2,
         dt.date(2026, 11, 1): 3,
@@ -218,6 +218,6 @@ def test_twenty_three():
 
 
 # start_date of None means no limit
-def test_twenty_four():
+def test_compute_todo_no_start_date():
     activity = {dt.date(2020, 1, 1): 2, dt.date(2026, 11, 1): 3}
     assert compute_todo(activity, {}, start_date=None) == activity
